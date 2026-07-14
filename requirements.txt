@@ -1,0 +1,24 @@
+# Core
+fastapi==0.115.6
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# Database
+SQLAlchemy==2.0.36
+alembic==1.14.0
+psycopg[binary]==3.2.3
+
+# Data processing
+pandas==2.2.3
+openpyxl==3.1.5
+rapidfuzz==3.11.0
+
+# CLI
+typer==0.15.1
+rich==13.9.4
+
+# Optional — LLM stage (disabled without OPENAI_API_KEY)
+openai==1.59.6
+
+# Testing
+pytest==8.3.4
