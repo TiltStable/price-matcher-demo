@@ -153,3 +153,4 @@ price_history      — append-only история изменения лучше�
 ## Лицензия
 
 MIT
+
