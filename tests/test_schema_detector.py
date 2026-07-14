@@ -49,3 +49,27 @@ def test_get_returns_value_from_correct_column():
 
 def test_empty_rows_returns_empty_mapping():
     assert detect_schema([]).mapping == {}
+
+
+def test_fuzzy_matches_multiple_unmapped_fields():
+    """Regression: a rogue `break` previously aborted the fuzzy phase after the
+    first match, so only ONE non-synonym column could ever be fuzzy-matched.
+    With several unusual headers all needing fuzzy matching, MORE THAN ONE
+    must resolve (the old code resolved only one).
+    """
+    rows = [
+        ParsedRow(raw={
+            "наименование": "Мука",              # close to "наименование" synonym
+            "кол-во на складе": "10",            # close to "на складе" / "наличие"
+            "cost per unit": "65",               # close to some price/cost synonym
+        })
+    ]
+    m = detect_schema(rows)
+    # The regression bug: with the old `break`, only 1 column got mapped here.
+    # Now at least 2 distinct source columns must be claimed via fuzzy matching.
+    assert len(m.mapping) >= 2, (
+        f"Expected >=2 fuzzy-mapped columns, got mapping={m.mapping}"
+    )
+    assert len(set(m.mapping.values())) == len(m.mapping), (
+        "All mapped fields should point to distinct source columns"
+    )

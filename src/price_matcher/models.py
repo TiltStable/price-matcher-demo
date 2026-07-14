@@ -109,6 +109,13 @@ class SupplierOffer(Base):
     quantity_base: Mapped[float | None] = mapped_column(Numeric(12, 3), nullable=True)
     unit_base: Mapped[str | None] = mapped_column(String(8), nullable=True)
 
+    # Price per 1 base unit (g / ml / pcs). NULL when quantity_base is NULL.
+    # This is the field the best-price aggregator compares — comparing raw
+    # `price` is wrong when suppliers sell the same product in different pack
+    # sizes (1 kg vs 5 kg). Persisted (not computed on the fly) so it can be
+    # indexed and so the aggregator avoids float equality on a Numeric column.
+    price_per_base_unit: Mapped[float | None] = mapped_column(Numeric(14, 6), nullable=True)
+
     # Matching audit.
     match_method: Mapped[Literal["exact", "fuzzy", "llm", "manual", "none"]] = mapped_column(
         String(16), nullable=False, default="none"
@@ -141,8 +148,11 @@ class PriceHistory(Base):
     product_id: Mapped[int] = mapped_column(
         ForeignKey("products.id", ondelete="CASCADE"), nullable=False
     )
-    best_offer_id: Mapped[int] = mapped_column(
-        ForeignKey("supplier_offers.id", ondelete="CASCADE"), nullable=False
+    # SET NULL, not CASCADE: when a supplier offer is deleted on re-ingest,
+    # the price snapshot in this row must survive (price + product_id remain).
+    # Otherwise re-ingestion destroys the entire price history.
+    best_offer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("supplier_offers.id", ondelete="SET NULL"), nullable=True
     )
     price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(

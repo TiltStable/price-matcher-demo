@@ -127,25 +127,28 @@ def detect_schema(rows: list[ParsedRow]) -> ColumnMapping:
                 break
 
     # 2) Fuzzy match for remaining canonical fields against unmatched columns.
-    all_synonyms_flat = [
-        (field_name, syn)
-        for field_name, syns in _SYNONYMS.items()
-        for syn in syns
-        if field_name not in mapping
-    ]
+    # For each still-unmapped canonical field, try every synonym against every
+    # still-unmatched column; the first synonym that fuzzy-matches (>= cutoff)
+    # claims the column and we move to the next field.
     unmatched_norms = {
         col: norm for col, norm in normalized.items() if col not in matched_columns
     }
-
-    for field_name, syn in all_synonyms_flat:
+    for field_name, synonyms in _SYNONYMS.items():
         if field_name in mapping:
             continue
-        choices = list(unmatched_norms.values())
-        if not choices:
+        if not unmatched_norms:
             break
-        match = process.extractOne(syn, choices, score_cutoff=88)
-        if match is not None:
-            matched_norm, score, _ = match
+        # Find the best (field, synonym, column) triple for this field.
+        best_match: tuple[str, float] | None = None  # (column, score)
+        best_syn: str | None = None
+        for syn in synonyms:
+            choices = list(unmatched_norms.values())
+            match = process.extractOne(syn, choices, score_cutoff=88)
+            if match is not None and (best_match is None or match[1] > best_match[1]):
+                best_match = (match[0], match[1])
+                best_syn = syn
+        if best_match is not None:
+            matched_norm, score = best_match
             # Reverse-lookup the original column name from the normalized form.
             for col, norm in unmatched_norms.items():
                 if norm == matched_norm:
@@ -153,7 +156,6 @@ def detect_schema(rows: list[ParsedRow]) -> ColumnMapping:
                     matched_columns.add(col)
                     del unmatched_norms[col]
                     break
-            break
 
     unmatched_columns = [col for col in columns if col not in matched_columns]
     # 'name' is mandatory; others are optional. Score reflects coverage of all fields.

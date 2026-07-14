@@ -31,6 +31,7 @@ class NormalizedOffer(BaseModel):
     stock: str | None = None
     quantity_base: float | None = None
     unit_base: Literal["g", "ml", "pcs"] | None = None
+    price_per_base_unit: float | None = None
 
     def model_post_init(self, __context) -> None:  # type: ignore[override]
         if self.price < 0:
@@ -53,9 +54,17 @@ class BestPriceRecord(BaseModel):
     sku: str
     name: str
     brand: str | None = None
-    best_price: float
+    # Best price per 1 base unit (g / ml / pcs). This is the fair-comparison
+    # value: offers with different pack sizes are compared by price per unit,
+    # not by raw price. None when no offer had a recognized pack size.
+    best_price_per_unit: float | None = None
+    # The raw price of the winning offer (for reference).
+    best_raw_price: float
     best_supplier: str
     best_offer_id: int
+    # Pack size of the winning offer, so the consumer can interpret the price.
+    best_quantity_base: float | None = None
+    best_unit_base: str | None = None
     updated_at: datetime
     source: str = "auto"
     check_status: Literal["auto", "verified", "review"] = "auto"

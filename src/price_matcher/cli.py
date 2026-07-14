@@ -43,11 +43,16 @@ def ingest(
     from price_matcher.db import session_scope
 
     with session_scope() as session:
-        rows, inserted, mapping_json = ingest_price_list(session, supplier, file)
+        rows, inserted, mapping_json, skipped = ingest_price_list(session, supplier, file)
     console.print(
         f"[green]✓[/green] {supplier}: read {rows} rows, inserted {inserted} offers."
     )
     console.print(f"  schema mapping: {mapping_json}")
+    total_skipped = sum(skipped.values())
+    if total_skipped:
+        console.print(
+            f"  [yellow]![/yellow] {total_skipped} rows skipped — breakdown: {skipped}"
+        )
 
 
 @app.command()
@@ -88,6 +93,14 @@ def run(
     t.add_row("Offers loaded", str(stats.offers_loaded))
     t.add_row("Offers matched (existing products)", str(stats.offers_matched))
     t.add_row("Offers unmatched (new products created)", str(stats.offers_unmatched))
+    total_skipped = sum(stats.rows_skipped.values())
+    if total_skipped:
+        t.add_row(
+            "Rows skipped (no name / bad price)",
+            f"{total_skipped} — {stats.rows_skipped}",
+        )
+    else:
+        t.add_row("Rows skipped", "0")
     console.print(t)
 
     out_path = export_records(records, out)

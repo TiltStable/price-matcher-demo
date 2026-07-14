@@ -31,6 +31,7 @@ class PipelineStats:
     offers_matched: int
     offers_unmatched: int
     products_in_catalog: int
+    rows_skipped: dict[str, int]  # {reason: count} — rows read but not inserted
 
 
 def run_pipeline(
@@ -52,9 +53,12 @@ def run_pipeline(
         _load_master_products(session, master_csv)
 
         offers_loaded = 0
+        skipped_total: dict[str, int] = {}
         for supplier_name, path in price_lists:
-            _, inserted, _ = ingest_price_list(session, supplier_name, path)
+            _, inserted, _, skipped = ingest_price_list(session, supplier_name, path)
             offers_loaded += inserted
+            for reason, count in skipped.items():
+                skipped_total[reason] = skipped_total.get(reason, 0) + count
 
         matched, unmatched = _match_all_offers(session)
         records = recompute_best_prices(session)
@@ -67,6 +71,7 @@ def run_pipeline(
         offers_matched=matched,
         offers_unmatched=unmatched,
         products_in_catalog=products_in_catalog,
+        rows_skipped=skipped_total,
     )
     return stats, records
 
@@ -97,7 +102,8 @@ def _load_master_products(session: Session, master_csv: str | Path | None) -> No
         existing.quantity_base = _cell(row, "quantity_base")
         existing.unit_base = _cell(row, "unit_base")
         existing.packaging_raw = _cell(row, "packaging_raw")
-    session.commit()
+    # No commit — owned by run_pipeline's session_scope.
+    session.flush()
 
 
 def _cell(row, name: str):
@@ -166,5 +172,6 @@ def _match_all_offers(session: Session) -> tuple[int, int]:
             offer_obj.match_detail = "auto-created master product"
             unmatched += 1
 
-    session.commit()
+    # No commit — owned by run_pipeline's session_scope.
+    session.flush()
     return matched, unmatched
