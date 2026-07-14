@@ -154,3 +154,4 @@ price_history      — append-only история изменения лучше�
 
 MIT
 
+
